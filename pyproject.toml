@@ -1,0 +1,58 @@
+[project]
+name = "agents-course"
+version = "0.1.0"
+requires-python = ">=3.11.11"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "duckduckgo-search>=8.0.2",
+    "fake-useragent>=2.2.0",
+    "langchain>=0.3.25",
+    "langchain-community>=0.3.24",
+    "langchain-experimental>=0.3.4",
+    "langchain-google-genai>=2.1.5",
+    "langchain-ollama>=0.3.3",
+    "langfuse>=3.0.0",
+    "langgraph>=0.4.5",
+    "nltk>=3.9.1",
+    "openai-whisper==20240930",
+    "openpyxl>=3.1.5",
+    "pandas>=2.2.3",
+    "rank-bm25>=0.2.2",
+    "torch>=2.7.0",
+    "wikipedia>=1.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "mypy>=1.16.0",
+    "ruff>=0.11.12",
+]
+
+[tool.uv.sources]
+torch = {index = "pytorch-cu128"}
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+
