@@ -1,15 +1,15 @@
 from typing import Annotated, Literal
 
-from langchain_community.tools import DuckDuckGoSearchResults
+from langchain_community.tools import BraveSearch  # DuckDuckGoSearchResults
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AnyMessage
+from langchain_core.messages import AnyMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
-from app.prompts import FINAL_ANSWER_FORMAT
+from app.prompts import FORMAT_ANSWER_SYSTEM_MESSAGE
 from app.tools import (
     DescribeImageTool,
     get_website_content,
@@ -20,7 +20,7 @@ from app.tools import (
 
 
 class Answer(BaseModel):
-    final_answer: str = Field(description=FINAL_ANSWER_FORMAT)
+    final_answer: str = Field(description="Final answer to the question, after being formatted.")
 
 
 class State(BaseModel):
@@ -28,21 +28,22 @@ class State(BaseModel):
     structured_output: Answer | None = None
 
 
-def create_agent(chat_model: BaseChatModel) -> CompiledStateGraph:
+def create_agent(agent_model: BaseChatModel, aux_model: BaseChatModel) -> CompiledStateGraph:
     tools = [
         transcribe_audio,
         DescribeImageTool(),
         python_repl_tool,
-        DuckDuckGoSearchResults(output_format="json"),
+        # DuckDuckGoSearchResults(output_format="json"),
+        BraveSearch.from_search_kwargs(search_kwargs={"count": 5}),
         get_wikipedia_page_content,
         get_website_content,
     ]
     tools_node = ToolNode(tools=tools)
-    chat_model_with_tools = chat_model.bind_tools(tools)
-    model_with_structured_output = chat_model.with_structured_output(Answer)
+    agent_model_with_tools = agent_model.bind_tools(tools)
+    aux_model_with_structured_output = aux_model.with_structured_output(Answer)
 
     def chat_model_node(state: State) -> dict:
-        return {"messages": [chat_model_with_tools.invoke(state.messages)]}
+        return {"messages": [agent_model_with_tools.invoke(state.messages)]}
 
     def tools_or_format_answer_condition(state: State) -> Literal["format_answer", "tools"]:
         try:
@@ -54,8 +55,8 @@ def create_agent(chat_model: BaseChatModel) -> CompiledStateGraph:
         return "format_answer"
 
     def format_answer_node(state: State) -> dict:
-        messages = [state.messages[0], state.messages[-1]]
-        return {"structured_output": model_with_structured_output.invoke(messages)}
+        messages = [SystemMessage(content=FORMAT_ANSWER_SYSTEM_MESSAGE), state.messages[1], state.messages[-1]]
+        return {"structured_output": aux_model_with_structured_output.invoke(messages)}
 
     graph_builder = StateGraph(State)
     graph_builder.add_node("chat_model", chat_model_node)

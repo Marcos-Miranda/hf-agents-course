@@ -20,7 +20,7 @@ from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
-from app.prompts import DESCRIBE_IMAGE
+from app.prompts import DESCRIBE_IMAGE_USER_MESSAGE
 
 nltk.download("punkt_tab")
 whisper_model = whisper.load_model("turbo")
@@ -53,7 +53,7 @@ def split_wikipedia_page(page: wikipedia.WikipediaPage, soup: BeautifulSoup) -> 
         elif current_section:
             sections[current_section] += str(elem)
     return [
-        Document(metadata={"section": sec_name}, page_content=_process_section_content(sec_content))
+        Document(metadata={"page": page.title, "section": sec_name}, page_content=_process_section_content(sec_content))
         for sec_name, sec_content in sections.items()
     ]
 
@@ -109,7 +109,9 @@ def get_wikipedia_page_content(
     page = wikipedia.page(page_name)
     soup = BeautifulSoup(page.html(), "html.parser")
     documents = split_wikipedia_page(page, soup)
-    return retrieve_relevant_chunks(documents, relevant_section_keywords, k=2)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=100)
+    return retrieve_relevant_chunks(documents, relevant_section_keywords, k=2, text_splitter=text_splitter)
+
 
 @tool
 def get_website_content(
@@ -145,7 +147,7 @@ class DescribeImageTool(BaseTool):
     description: str = "Describes the content of an image."
     args_schema: ArgsSchema | None = DescribeImageInput
     model_name: str = "gemini-2.5-flash-preview-04-17"
-    prompt_message: str = DESCRIBE_IMAGE
+    prompt_message: str = DESCRIBE_IMAGE_USER_MESSAGE
 
     _chat_model: ChatGoogleGenerativeAI = PrivateAttr()
 
@@ -195,7 +197,10 @@ python_repl_tool = PythonREPLTool(
     description=(
         "A Python shell. Use this to execute python commands. Input should be a valid python command. "
         "Anytime you want to see the output of a value, you should print it out with `print(...)`. "
+        "If you get an empty output, "
+        "it means that the command executed successfully but there are no `print` statements, so you should add one. "
         "You can use pandas to manipulate structured data. For example, the following command would return the string "
-        "representation of a DataFrame: `import pandas as pd\nprint(pd.read_excel('file.xlsx'))`."
+        "representation of a DataFrame: `import pandas as pd\nprint(pd.read_excel('file.xlsx'))`. "
+        "You can also open files using the `open` function, e.g. `with open('file.txt', 'r') as f: print(f.read())`."
     )
 )
